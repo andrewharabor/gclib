@@ -10,7 +10,7 @@
                 "-g",
                 "${file}",
                 "-o",
-                "${fileDirname}/bin/${fileBasenameNoExtension}",
+                "${workspaceRoot}/bin/${fileBasenameNoExtension}",
                 "-lm" // for `<math.h>`
             ],
             "options": {
