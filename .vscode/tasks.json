@@ -9,6 +9,7 @@
                 "-fdiagnostics-color=always",
                 "-g",
                 "${file}",
+                "gc.c",
                 "-o",
                 "${workspaceRoot}/bin/${fileBasenameNoExtension}",
                 "-lm" // for `<math.h>`
