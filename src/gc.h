@@ -16,14 +16,20 @@ void gc_cleanup(void);
 /* Check if `gc_` functions are ready to run (`gc_init()` has been called but `gc_cleanup()` has not). */
 bool gc_ready(void);
 
-/* Allocate `size` bytes of memory and return a pointer to the beginning of the chunk. */
-void *gc_alloc(size_t size);
+/* Allocate `size` bytes of memory with the option to initialize the chunk to zero-bytes through `zeroed`; return a pointer to the beginning of the chunk. */
+void *gc_alloc(size_t size, bool zeroed);
 
-/* Explicitly free `ptr`, which should have been obtained through `gc_alloc()`. */
+/* Resize the chunk pointed to by `ptr` to `new_size` bytes; `ptr` should have been obtained through `gc_alloc()` or `gc_realloc()`. */
+void *gc_realloc(void *ptr, size_t new_size);
+
+/* Explicitly free the chunk pointed to by `ptr`, which should have been obtained through `gc_alloc()` or `gc_realloc()`. */
 void gc_free(void *ptr);
 
-/* Force the garbage collector to run a cycle and free unreachable memory chunks obtained through `gc_alloc()`. */
-void gc_force_collect();
+/* Explicitly run the garbage collector to free unreachable memory obtained through `gc_alloc()` or `gc_realloc()`; will have a limited effect if insufficient allocations have been accumulated. */
+void gc_collect(void);
+
+/* Force the garbage collector to free unreachable memory obtained through `gc_alloc()` or `gc_realloc()`, running a cycle through all allocations. */
+void gc_force_collect(void);
 
 
 #endif // GC_H

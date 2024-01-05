@@ -8,9 +8,10 @@
 
 #include "gc.h"
 
+static void hash_table_insert(void *ptr, size_t size);
+static void hash_table_remove(void *ptr);
+static void hash_table_free(void);
 static uint16_t hash_ptr(void *ptr);
-static void table_remove(void *ptr);
-static void table_insert(void *ptr, size_t size);
 
 // TODO: REMOVE DEBUG LOGGING (EVERYWHERE)
 #define DEBUG 1
@@ -23,7 +24,7 @@ static void table_insert(void *ptr, size_t size);
             }                                                                                      \
         } while (0)
 
-/* A node in a linked list containing information about a memory chunk allocated by `malloc()` through `gc_alloc()`. */
+/* A node in a linked list containing information about a memory chunk allocated by `malloc()`/`calloc()` through `gc_alloc()`. */
 typedef struct chunk_node
 {
     void *ptr;
@@ -35,21 +36,21 @@ typedef struct chunk_node
 #define HASH_TABLE_SIZE 1024
 #define GENERATIONS 3
 #define MAX_ALLOCED_BYTES (1e+9) // maximum size of all allocations (per generation) before running the collector; 1GB may be too conservative for actual use
-chunk_node *g_hash_table[GENERATIONS][HASH_TABLE_SIZE + 1];
-size_t g_alloced_bytes[GENERATIONS]; // total size of all allocations for each generation
+static chunk_node *g_hash_table[GENERATIONS][HASH_TABLE_SIZE + 1];
+static size_t g_alloced_bytes[GENERATIONS]; // total size of all allocations for each generation
 
 typedef uintptr_t generic_ptr; // `void *` also works instead of `uintptr_t` but this is more useful for memory alignment
 #define WORD sizeof(generic_ptr)
 
 extern char etext, edata, end; // end of text segment, initialized data segment, and BSS; all provided by the linker; https://linux.die.net/man/3/etext
 
-bool g_init = false;
-bool g_cleanup = false;
+static bool g_init = false;
+static bool g_cleanup = false;
 
-generic_ptr g_stack_start_ptr; // Address of the stack frame of `gc_alloc()` (the stack is iterated through in a top-down manner)
-generic_ptr g_stack_end_ptr;   // Address of the stack frame of `main()` (the stack is iterated through in a top-down manner)
-generic_ptr g_data_start_ptr;  // Address of the start of the initialized data segment
-generic_ptr g_data_end_ptr;    // Address of the end of the BSS segment
+static generic_ptr g_stack_start_ptr; // Address of the stack frame of `gc_alloc()` (the stack is iterated through in a top-down manner)
+static generic_ptr g_stack_end_ptr;   // Address of the stack frame of `main()` (the stack is iterated through in a top-down manner)
+static generic_ptr g_data_start_ptr;  // Address of the start of the initialized data segment
+static generic_ptr g_data_end_ptr;    // Address of the end of the BSS segment
 
 // TODO: Implement collector: mark reachable chunks in hash table and then sweep to free unreachable chunks
 // FIXME: generations MUST be collected in reverse order to avoid any issues with promotions (to higher generations)
@@ -88,7 +89,7 @@ void gc_cleanup(void)
         return;
     }
 
-    // TODO: free linked lists in hash table
+    hash_table_free();
 
     g_cleanup = true;
     debug_log("%s\n", "GC cleaned up");
@@ -101,7 +102,7 @@ bool gc_ready(void)
     return g_init && !g_cleanup;
 }
 
-void *gc_alloc(size_t size)
+void *gc_alloc(size_t size, bool zeroed)
 {
     void *ptr;
     uint8_t gen;
@@ -113,37 +114,113 @@ void *gc_alloc(size_t size)
         return NULL;
     }
 
-    for (gen = GENERATIONS - 1; 0 <= gen && gen < GENERATIONS; gen--)
+    gc_collect();
+
+    if (zeroed)
     {
-        if (g_alloced_bytes[gen] > MAX_ALLOCED_BYTES)
-        {
-            ; // TODO: run collector with `gen`
-        }
+        ptr = calloc(1, size);
+    }
+    else
+    {
+        ptr = malloc(size);
     }
 
-    ptr = malloc(size);
-    if (ptr == NULL)
+    // Handle any errors from `malloc()`/`calloc()`
+    if (ptr == NULL && size != 0)
     {
-        debug_log("%s\n", "`malloc()` failed");
+        debug_log("%s\n", "`malloc()`/`calloc()` failed");
 
-        for (gen = GENERATIONS - 1; 0 <= gen && gen < GENERATIONS; gen--)
+        gc_force_collect(); // likely not to improve the situation but not much else we can do
+
+        if (zeroed)
         {
-            ; // TODO: run collector with `gen`
+            ptr = calloc(1, size);
+        }
+        else
+        {
+            ptr = malloc(size);
         }
 
-        ptr = malloc(size);
         if (ptr == NULL)
         {
-            debug_log("%s\n", "`malloc()` failed again");
+            debug_log("%s\n", "`malloc()`/`calloc()` failed again");
 
-            return NULL; // there doesn't seem to be any reason to try `malloc()` again
+            return NULL;
         }
     }
 
-    table_insert(ptr, size);
+    if (size == 0)
+    {
+        debug_log("alloced nothing - size: %zu\n", size);
+
+        return NULL;
+    }
+
+    hash_table_insert(ptr, size);
     debug_log("alloced chunk - ptr: %p, size: %zu\n", ptr, size);
 
     return ptr;
+}
+
+void *gc_realloc(void *ptr, size_t new_size)
+{
+    void *new_ptr;
+
+    if (!gc_ready())
+    {
+        debug_log("%s\n", "GC is not ready");
+
+        return NULL;
+    }
+
+    gc_collect();
+
+    new_ptr = realloc(ptr, new_size);
+
+    // Handle any errors from `realloc()`
+    if (new_ptr == NULL && new_size != 0) // if `new_size` is zero, `realloc()` returning `NULL` is actually the intended effect
+    {
+        debug_log("%s\n", "`realloc()` failed");
+
+        gc_force_collect(); // likely not to improve the situation but not much else we can do
+
+        new_ptr = realloc(ptr, new_size);
+        if (new_ptr == NULL)
+        {
+            debug_log("%s\n", "`realloc()` failed again");
+
+            return NULL;
+        }
+    }
+
+    if (ptr == NULL) // `realloc(NULL, new_size)` acts as `malloc(new_size)`
+    {
+        if (new_size == 0)
+        {
+            debug_log("alloced nothing - ptr: %p, size: %zu\n", ptr, new_size);
+
+            return NULL;
+        }
+
+        hash_table_insert(new_ptr, new_size);
+        debug_log("alloced chunk - ptr: %p, size: %zu\n", new_ptr, new_size);
+
+        return new_ptr;
+    }
+
+    if (new_size == 0) // `realloc(ptr, 0)` acts as `free(ptr)` and returns `NULL`
+    {
+        hash_table_remove(ptr);
+        debug_log("freed chunk - ptr: %p\n", ptr);
+
+        return NULL;
+    }
+
+    hash_table_remove(ptr);
+    hash_table_insert(new_ptr, new_size);
+    debug_log("realloced chunk - ptr: %p, new ptr: %p, new size: %zu\n", ptr, new_ptr, new_size);
+
+    return new_ptr;
 }
 
 void gc_free(void *ptr)
@@ -155,13 +232,13 @@ void gc_free(void *ptr)
         return;
     }
 
-    table_remove(ptr);
+    hash_table_remove(ptr);
     debug_log("freed chunk - ptr: %p\n", ptr);
 
     return;
 }
 
-void gc_force_collect()
+void gc_collect(void)
 {
     uint8_t gen;
 
@@ -172,6 +249,30 @@ void gc_force_collect()
         return;
     }
 
+    // Note that generations MUST be collected in reverse order to avoid any issues with promoting chunks to higher generations
+    for (gen = GENERATIONS - 1; 0 <= gen && gen < GENERATIONS; gen--)
+    {
+        if (g_alloced_bytes[gen] > MAX_ALLOCED_BYTES)
+        {
+            ; // TODO: run collector with `gen`
+        }
+    }
+
+    return;
+}
+
+void gc_force_collect(void)
+{
+    uint8_t gen;
+
+    if (!gc_ready())
+    {
+        debug_log("%s\n", "GC is not ready");
+
+        return;
+    }
+
+    // Run the collector, regardless of how many bytes are allocated for each generation
     for (gen = GENERATIONS - 1; 0 <= gen && gen < GENERATIONS; gen--)
     {
         ; // TODO: run collector with `gen`
@@ -181,11 +282,12 @@ void gc_force_collect()
 }
 
 /* Insert a `chunk_node` containing `ptr` and `size` into `g_hash_table`. */
-static void table_insert(void *ptr, size_t size)
+static void hash_table_insert(void *ptr, size_t size)
 {
     uint16_t idx;
     chunk_node *p_node;
 
+    // Allocate and initialze new `chunk_node`
     p_node = malloc(sizeof(chunk_node)); // using `malloc()` for internal memory needs shouldn't interfere with the collector
     if (p_node == NULL)
     {
@@ -198,6 +300,7 @@ static void table_insert(void *ptr, size_t size)
     p_node->size = size;
     p_node->reachable = false; // set to `true` during the mark phase of the collector
 
+    // Insert as new head of linked list in the hash table
     idx = hash_ptr(ptr);
     p_node->next = g_hash_table[0][idx];
     g_hash_table[0][idx] = p_node; // insert into generation 0 since it's a new allocation
@@ -209,7 +312,7 @@ static void table_insert(void *ptr, size_t size)
 }
 
 /* Remove all `chunk_nodes` containing `ptr`. Note that this combs through all generations to look for the corresponding node. */
-static void table_remove(void *ptr)
+static void hash_table_remove(void *ptr)
 {
     uint16_t idx;
     uint8_t gen;
@@ -228,18 +331,20 @@ static void table_remove(void *ptr)
 
         do
         {
-            if (p_current->ptr == ptr)
+            if (p_current->ptr == ptr) // matches the pointer to remove
             {
                 size = p_current->size;
 
                 if (p_previous == NULL) // `p_current` is the head of the list
                 {
+                    // Set the next node as the head and free the current one
                     g_hash_table[gen][idx] = p_current->next;
                     free(p_current);
-                    p_current = g_hash_table[gen][idx]; // the new head is now the next node in the list
+                    p_current = g_hash_table[gen][idx];
                 }
                 else
                 {
+                    // Skip over the current node and free it
                     p_previous->next = p_current->next;
                     free(p_current);
                     p_current = p_previous->next;
@@ -251,12 +356,43 @@ static void table_remove(void *ptr)
             }
             else
             {
+                // Increment the previous and current nodes
                 p_previous = p_current;
                 p_current = p_current->next;
             }
         }
         while (p_current != NULL);
     }
+
+    return;
+}
+
+/* Free all `chunk_node` linked lists residing in `g_hash_table`. */
+static void hash_table_free(void)
+{
+    uint16_t idx;
+    uint8_t gen;
+    chunk_node *p_current, *p_tmp;
+
+    for (gen = 0; gen < GENERATIONS; gen++)
+    {
+        for (idx = 0; idx < HASH_TABLE_SIZE; idx++)
+        {
+            // Iterate through linked list and free each node
+            p_current = g_hash_table[gen][idx];
+            while (p_current != NULL)
+            {
+                p_tmp = p_current;
+                p_current = p_current->next;
+                p_tmp->next = NULL;
+                free(p_tmp);
+            }
+
+            g_hash_table[gen][idx] = NULL;
+        }
+    }
+
+    debug_log("%s\n", "cleaned up hash table");
 
     return;
 }
