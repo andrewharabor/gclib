@@ -6,14 +6,14 @@
 #include <stddef.h>
 
 /* Initialize the garbage collector.
-MUST BE CALLED FROM `main()` AND BEFORE ANY OTHER `gc_` FUNCTION IS USED. */
+MUST BE CALLED FROM `main()` AND BEFORE ANY OTHER `gc` FUNCTION IS USED. */
 void gc_init(void);
 
 /* Clean up any resources the garbage collector used.
-SHOULD ONLY BE CALLED AFTER ALL `gc_` FUNCTIONS ARE USED. */
+SHOULD ONLY BE CALLED AFTER ALL `gc` FUNCTIONS ARE USED. */
 void gc_cleanup(void);
 
-/* Check if `gc_` functions are ready to run (`gc_init()` has been called but `gc_cleanup()` has not). */
+/* Check if `gc` functions are ready to run (`gc_init()` has been called but `gc_cleanup()` has not). */
 bool gc_ready(void);
 
 /* Allocate `size` bytes of memory with the option to initialize the chunk to zero-bytes through `zeroed`; return a pointer to the beginning of the chunk. */
