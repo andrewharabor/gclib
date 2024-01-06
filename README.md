@@ -8,6 +8,6 @@ A conservative and generational garbage collector that uses the mark-and-sweep a
 
 [Boehm-Demers-Weiser Garbage Collector](https://github.com/ivmai/bdwgc/tree/master)
 
-[Writing a Simple Garbage Collector in C](https://maplant.com/gc.html#orgdef0675)
+[Writing a Simple Garbage Collector in C](https://maplant.com/gc.html)
 
 [SimpleGC](https://github.com/gtoubassi/SimpleGC)
