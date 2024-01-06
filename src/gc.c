@@ -8,11 +8,6 @@
 
 #include "gc.h"
 
-static void hash_table_insert(void *ptr, size_t size);
-static void hash_table_remove(void *ptr);
-static void hash_table_free(void);
-static uint16_t hash_ptr(void *ptr);
-
 // TODO: REMOVE DEBUG LOGGING (EVERYWHERE)
 #define DEBUG 1
 #define debug_log(format, ...)                                                                     \
@@ -35,7 +30,7 @@ typedef struct chunk_node
 
 #define HASH_TABLE_SIZE 1024
 #define GENERATIONS 3
-#define MAX_ALLOCED_BYTES (1e+9) // maximum size of all allocations (per generation) before running the collector; 1GB may be too conservative for actual use
+#define MAX_ALLOCED_BYTES (1e+9) // maximum size of all allocations (per generation) before running the collector; 1GB may not be optimal for actual use
 static chunk_node *g_hash_table[GENERATIONS][HASH_TABLE_SIZE + 1];
 static size_t g_alloced_bytes[GENERATIONS]; // total size of all allocations for each generation
 
@@ -53,8 +48,15 @@ static generic_ptr g_data_start_ptr;  // Address of the start of the initialized
 static generic_ptr g_data_end_ptr;    // Address of the end of the BSS segment
 
 // TODO: Implement collector: mark reachable chunks in hash table and then sweep to free unreachable chunks
-// FIXME: generations MUST be collected in reverse order to avoid any issues with promotions (to higher generations)
-// FIXME: `gc_alloc()` calls the collector so call `__builtin_frame_address(1)` from the collector to get `g_stack_end_ptr`
+// TODO: generations MUST be collected in reverse order to avoid any issues with promotions (to higher generations)
+// TODO: store the generations to collect in an array so they can be marked and swept with one function call
+// TODO: `gc_alloc()` calls the collector so call `__builtin_frame_address(1)` from the collector to get `g_stack_end_ptr`
+
+static void hash_table_insert(void *ptr, size_t size);
+static void hash_table_remove(void *ptr);
+static void hash_table_free(void);
+static void list_unlink(uint8_t gen, uint16_t idx, chunk_node *p_node, chunk_node *p_previous);
+static uint16_t hash_ptr(void *ptr);
 
 void gc_init(void)
 {
@@ -114,7 +116,7 @@ void *gc_alloc(size_t size, bool zeroed)
         return NULL;
     }
 
-    gc_collect();
+    // TODO: run collector
 
     if (zeroed)
     {
@@ -130,7 +132,7 @@ void *gc_alloc(size_t size, bool zeroed)
     {
         debug_log("%s\n", "`malloc()`/`calloc()` failed");
 
-        gc_force_collect(); // likely not to improve the situation but not much else we can do
+        // TODO: run collector for all generations // likely not to improve the situation but not much else we can do
 
         if (zeroed)
         {
@@ -173,7 +175,7 @@ void *gc_realloc(void *ptr, size_t new_size)
         return NULL;
     }
 
-    gc_collect();
+    // TODO: run collector
 
     new_ptr = realloc(ptr, new_size);
 
@@ -182,7 +184,7 @@ void *gc_realloc(void *ptr, size_t new_size)
     {
         debug_log("%s\n", "`realloc()` failed");
 
-        gc_force_collect(); // likely not to improve the situation but not much else we can do
+        // TODO: run collector for all generations // likely not to improve the situation but not much else we can do
 
         new_ptr = realloc(ptr, new_size);
         if (new_ptr == NULL)
@@ -249,14 +251,7 @@ void gc_collect(void)
         return;
     }
 
-    // Note that generations MUST be collected in reverse order to avoid any issues with promoting chunks to higher generations
-    for (gen = GENERATIONS - 1; 0 <= gen && gen < GENERATIONS; gen--)
-    {
-        if (g_alloced_bytes[gen] > MAX_ALLOCED_BYTES)
-        {
-            ; // TODO: run collector with `gen`
-        }
-    }
+    // TODO: run the collector
 
     return;
 }
@@ -272,11 +267,7 @@ void gc_force_collect(void)
         return;
     }
 
-    // Run the collector, regardless of how many bytes are allocated for each generation
-    for (gen = GENERATIONS - 1; 0 <= gen && gen < GENERATIONS; gen--)
-    {
-        ; // TODO: run collector with `gen`
-    }
+    // TODO: run the collector for all generations
 
     return;
 }
@@ -298,7 +289,7 @@ static void hash_table_insert(void *ptr, size_t size)
 
     p_node->ptr = ptr;
     p_node->size = size;
-    p_node->reachable = false; // set to `true` during the mark phase of the collector
+    p_node->reachable = false; // handled during the mark phase of the collector
 
     // Insert as new head of linked list in the hash table
     idx = hash_ptr(ptr);
@@ -306,12 +297,12 @@ static void hash_table_insert(void *ptr, size_t size)
     g_hash_table[0][idx] = p_node; // insert into generation 0 since it's a new allocation
     g_alloced_bytes[0] += size;
 
-    debug_log("inserted chunk (gen 0) - ptr: %p, size: %zu\n", ptr, size);
+    debug_log("inserted chunk - ptr: %p, size: %zu, gen: 0\n", ptr, size);
 
     return;
 }
 
-/* Remove all `chunk_nodes` containing `ptr`. Note that this combs through all generations to look for the corresponding node. */
+/* Remove all `chunk_nodes` containing `ptr` across all generations */
 static void hash_table_remove(void *ptr)
 {
     uint16_t idx;
@@ -324,44 +315,28 @@ static void hash_table_remove(void *ptr)
     {
         p_previous = NULL;
         p_current = g_hash_table[gen][idx];
-        if (p_current == NULL) // no list in this generation for this hash value
-        {
-            continue;
-        }
-
-        do
+        while (p_current != NULL)
         {
             if (p_current->ptr == ptr) // matches the pointer to remove
             {
-                size = p_current->size;
+                size = p_current->size; // TODO: remove along with debug logging
+                list_unlink(gen, idx, p_current, p_previous);
 
-                if (p_previous == NULL) // `p_current` is the head of the list
+                debug_log("removed chunk - ptr: %p, size: %zu, gen: %d\n", ptr, size, gen);
+
+                if (p_previous == NULL) // removed head of list so now it's empty
                 {
-                    // Set the next node as the head and free the current one
-                    g_hash_table[gen][idx] = p_current->next;
-                    free(p_current);
-                    p_current = g_hash_table[gen][idx];
-                }
-                else
-                {
-                    // Skip over the current node and free it
-                    p_previous->next = p_current->next;
-                    free(p_current);
-                    p_current = p_previous->next;
+                    continue;
                 }
 
-                g_alloced_bytes[gen] -= size;
-
-                debug_log("removed chunk (gen %d) - ptr: %p, size: %zu\n", gen, ptr, size);
+                p_current = p_previous->next;
             }
             else
             {
-                // Increment the previous and current nodes
                 p_previous = p_current;
                 p_current = p_current->next;
             }
         }
-        while (p_current != NULL);
     }
 
     return;
@@ -378,13 +353,12 @@ static void hash_table_free(void)
     {
         for (idx = 0; idx < HASH_TABLE_SIZE; idx++)
         {
-            // Iterate through linked list and free each node
+            // Iterate through the linked list and free each node
             p_current = g_hash_table[gen][idx];
             while (p_current != NULL)
             {
                 p_tmp = p_current;
                 p_current = p_current->next;
-                p_tmp->next = NULL;
                 free(p_tmp);
             }
 
@@ -393,6 +367,29 @@ static void hash_table_free(void)
     }
 
     debug_log("%s\n", "cleaned up hash table");
+
+    return;
+}
+
+/* Unlink and free the `chunk_node` `*p_node`from the linked list starting at `g_hash_table[gen][idx]`. */
+static void list_unlink(uint8_t gen, uint16_t idx, chunk_node *p_node, chunk_node *p_previous)
+{
+    size_t size;
+
+    size = p_node->size;
+
+    if (p_previous == NULL) // `p_node` is the head of the list
+    {
+        g_hash_table[gen][idx] = p_node->next;
+        free(p_node);
+    }
+    else
+    {
+        p_previous->next = p_node->next;
+        free(p_node);
+    }
+
+    g_alloced_bytes[gen] -= size;
 
     return;
 }
