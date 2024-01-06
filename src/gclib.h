@@ -1,6 +1,6 @@
 
-#ifndef GC_H
-#define GC_H
+#ifndef GCLIB_H
+#define GCLIB_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -32,4 +32,4 @@ void gc_collect(void);
 void gc_force_collect(void);
 
 
-#endif // GC_H
+#endif // GCLIB_H

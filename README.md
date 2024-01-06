@@ -1,4 +1,4 @@
-# C Garbage Collector
+# gclib
 
 A conservative and generational garbage collector that uses the mark-and-sweep algorithm, written in and for C.
 

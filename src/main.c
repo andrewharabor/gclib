@@ -1,5 +1,5 @@
 
-#include "gc.h"
+#include "gclib.h"
 
 int main(void)
 {
