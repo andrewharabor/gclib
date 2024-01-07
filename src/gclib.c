@@ -117,6 +117,8 @@ void *gclib_alloc(size_t size, bool zeroed)
     {
         debug_log("alloced nothing - size: %zu\n", size);
 
+        free(ptr); // `malloc()`/`calloc()` may not always return `NULL` in this case
+
         return NULL;
     }
 
@@ -162,6 +164,8 @@ void *gclib_realloc(void *ptr, size_t new_size)
         if (new_size == 0)
         {
             debug_log("alloced nothing - ptr: %p, size: %zu\n", ptr, new_size);
+
+            free(new_ptr); // `malloc()`/`calloc()` may not always return `NULL` in this case
 
             return NULL;
         }
