@@ -13,13 +13,10 @@ Initialize `gclib`.
 MUST BE CALLED FROM `main()` AND BEFORE THE PROGRAM USES ANY `gclib` FUNCTIONS.
 
 ### Description
-The main job of `gclib_init()` is to define pointers to the initialized data segment and BSS along with a pointer to
-the stack. It relies on being called from `main()` as it defines the stack pointer to be the address of the beginning
-of the stack frame of the caller function. This means that if `gclib_init()` is used incorrectly, the garbage collector
-will function with an offset stack pointer and will not be fully effective.
-
-If `gclib_init()` isn't called before a `gclib` function is used, the function will return immediately and return a
-null-value.
+The main job of `gclib_init()` is to define important addresses in the processes' memory structure for the
+garbage collection step. If it is used incorrectly, the garbage collector will function as normal though will not be fully
+effective in freeing unreachable memory chunks. Note that if `gclib_init()` isn't called before a `gclib`
+function is used, the function will return immediately and return a null-value.
 
 ### Parameters
 None.
@@ -28,9 +25,6 @@ None.
 None.
 */
 void gclib_init(void);
-
-/* Clean up any resources used by the garbage collector.
-SHOULD ONLY BE CALLED AFTER ALL `gclib` FUNCTIONS ARE USED. */
 
 /*
 ### Synopsis
@@ -50,15 +44,73 @@ None.
 */
 void gclib_cleanup(void);
 
-/* Check if `gclib` functions are ready to run (`gclib_init()` has been called but `gclib_cleanup()` has not). */
+/*
+### Synopsis
+Indicate if `gclib` functions are ready to be called.
+
+### Description
+None.
+
+### Parameters
+None.
+
+### Return Value
+The return value is `true` if `gclib_init()` has been called but `gclib_cleanup()`, which means `gclib`
+functions can be called. Otherwise, `gclib_ready()` returns `false`. Note that the `bool` types are defined as
+`#define true 1` and `#define false 0` so the numerical literals can be interpreted instead.
+*/
 bool gclib_ready(void);
 
-/* Allocate `size` bytes of memory with the option to initialize the chunk to zero-bytes through the `zeroed` flag.
-Return a pointer to the beginning of the chunk. */
+/*
+### Synopsis
+Dynamically allocate a chunk of memory subject to garbage collection.
+
+### Description
+`gclib_alloc()` acts as a wrapper around `malloc()` or `calloc()`, using the `zeroed` parameter to
+determine which one to call and then passing the `size` argument. As such, it mirrors the behavior of these
+standard-library functions. The result is stored internally for `gclib` to use later on during the garbage collection
+process.
+
+### Parameters
+`size` - The size in bytes of the memory chunk to be allocated.
+`zeroed` - The option to initialize all bytes in the allocated chunk to zero. Enabling this option may result in
+slower runtime. Note that `bool` types are defined as `#define true 1` and `#define false 0` so the
+respective numerical literals work as well.
+
+### Return Value
+If the return value is a not `NULL`, it is a valid pointer to a memory chunk allocated by `malloc()` or `calloc()`
+that can be freed through `gclib_free()`. Note that while this pointer can also be freed through the
+standard-library function `free()`, `gclib` will be oblivious to this and the collector will later try to free the pointer
+when the chunk is determined unreachable, resulting in undefined and erroneous behavior. If the `size` argument is
+equal to zero, `gclib_alloc()` will return `NULL`. Otherwise, a return value of `NULL` indicates that `malloc()` or
+`calloc()` failed, even after running the garbage collector and trying again.
+*/
 void *gclib_alloc(size_t size, bool zeroed);
 
-/* Resize the chunk pointed to by `ptr` to `new_size` bytes.
-`ptr` should have been obtained through `gclib_alloc()` or `gclib_realloc()`. */
+/*
+### Synopsis
+Resize a chunk of dynamically allocated memory subject to garbage collection.
+
+### Description
+`gclib_realloc()` acts as a wrapper around `realloc()` by passing the `ptr` and `new_size` argument to it.
+As such, it mirrors the behavior of this standard-library function. The result is stored internally for `gclib` to
+use later on during the garbage collection process.
+
+### Parameters
+`ptr` - The pointer to the memory chunk that is to be resized. Note that `ptr` must have been returned by either
+`gclib_alloc()` or `gclib_realloc()`; any other pointer results in undefined and erroneous behavior.
+`new_size` - The size in bytes that the resized memory chunk should have.
+
+### Return Value
+If the return value is a not `NULL`, it is a valid pointer to a memory chunk reallocated by `realloc()` that can be
+freed through `gclib_free()`. Note that while this pointer can also be freed through the standard-library function
+`free()`, `gclib` will be oblivious to this and the collector will later try to free the pointer when the chunk is
+determined unreachable, resulting in undefined and erroneous behavior. If the argument `ptr` is equal to `NULL`,
+the function will act as `gclib_alloc(new_size)` for all values of `new_size`. If `new_size` is equal to zero, the
+function will act as `gclib_free(ptr)`. In the case that `ptr` is `NULL` and `new_size` is zero, the function will
+return `NULL` (as specified when `gclib_alloc()` is called with zero). Otherwise, a return value of `NULL` indicates
+that `realloc()` failed, even after running the garbage collector and trying again.
+*/
 void *gclib_realloc(void *ptr, size_t new_size);
 
 /* Explicitly free the chunk pointed to by `ptr`, which should have been obtained through `gclib_alloc()` or `gclib_realloc()`. */
