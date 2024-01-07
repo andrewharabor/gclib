@@ -62,6 +62,38 @@ void table_remove(void *ptr)
     return;
 }
 
+void table_print(FILE *stream)
+{
+    uint16_t idx;
+    uint8_t gen;
+    uint32_t count;
+    size_t bytes;
+    chunk_node *p_node;
+
+    count = bytes = 0;
+    for (gen = 0; gen < GENERATIONS; gen++)
+    {
+        fprintf(stream, "Generation %d:\n\n", gen);
+
+        for (idx = 0; idx < HASH_TABLE_SIZE; idx++)
+        {
+            for (p_node = g_hash_table[gen][idx]; p_node != NULL; p_node = p_node->next)
+            {
+                count++;
+                bytes += p_node->size;
+
+                fprintf(stream, "\tUnfreed block:\n\t\tAddress: %p\n\t\tSize: %zu (bytes)\n\n", p_node->ptr, p_node->size);
+            }
+        }
+
+        fprintf(stream, "\n");
+    }
+
+    fprintf(stream, "TOTAL:\n\tUnfreed chunks: %d\n\tUnfreed bytes: %zu\n", count, bytes);
+
+    return;
+}
+
 void table_free(void)
 {
     uint16_t idx;

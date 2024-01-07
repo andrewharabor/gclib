@@ -2,9 +2,11 @@
 #ifndef GCLIB_TABLE_H_
 #define GCLIB_TABLE_H_
 
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 /* A node in a linked list containing information about an allocated memory chunk. */
@@ -27,6 +29,9 @@ void table_insert(void *ptr, size_t size);
 
 /* Remove all `chunk_nodes` containing `ptr` across all generations from `g_hash_table`. */
 void table_remove(void *ptr);
+
+/* Print all entries in `g_hash_table` to `stream`. */
+void table_print(FILE *stream);
 
 /* Free all `chunk_node` linked lists residing in `g_hash_table`. */
 void table_free(void);
