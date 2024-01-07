@@ -1,5 +1,7 @@
 # gclib
 
+A garbage collection library written in and for C
+
 A conservative and generational garbage collector that uses the mark-and-sweep algorithm, written in and for C.
 
 ## Inspiration
