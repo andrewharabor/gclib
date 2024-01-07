@@ -21,7 +21,7 @@ extern char etext, edata, end; // end of text segment, initialized data segment,
 static bool g_init = false;
 static bool g_cleanup = false;
 
-void gc_init(void)
+void gclib_init(void)
 {
     if (g_init || g_cleanup)
     {
@@ -32,7 +32,7 @@ void gc_init(void)
 
     // Getting pointers to the stack and data segments like this is hackish but there seems to be no better way.
     // Not to mention that this likely only works on x86-64 Linux AND when complied with GCC.
-    g_stack_end_ptr = ((const generic_ptr *) __builtin_frame_address(1)) + 1; // address of stack frame of caller of `gc_init()` (should be `main()`); https://gcc.gnu.org/onlinedocs/gcc/Return-Address.html#index-_005f_005fbuiltin_005fframe_005faddress
+    g_stack_end_ptr = ((const generic_ptr *) __builtin_frame_address(1)) + 1; // address of stack frame of caller of `gclib_init()` (should be `main()`); https://gcc.gnu.org/onlinedocs/gcc/Return-Address.html#index-_005f_005fbuiltin_005fframe_005faddress
     g_data_start_ptr = (const generic_ptr *) &etext;
     g_data_end_ptr = (const generic_ptr *) &end;
     debug_log("stack base: %p\n", g_stack_end_ptr);
@@ -45,9 +45,9 @@ void gc_init(void)
     return;
 }
 
-void gc_cleanup(void)
+void gclib_cleanup(void)
 {
-    if (!gc_ready())
+    if (!gclib_ready())
     {
         debug_log("%s\n", "GC is not ready");
 
@@ -62,16 +62,16 @@ void gc_cleanup(void)
     return;
 }
 
-bool gc_ready(void)
+bool gclib_ready(void)
 {
     return g_init && !g_cleanup;
 }
 
-void *gc_alloc(size_t size, bool zeroed)
+void *gclib_alloc(size_t size, bool zeroed)
 {
     void *ptr;
 
-    if (!gc_ready())
+    if (!gclib_ready())
     {
         debug_log("%s\n", "GC is not ready");
 
@@ -126,11 +126,11 @@ void *gc_alloc(size_t size, bool zeroed)
     return ptr;
 }
 
-void *gc_realloc(void *ptr, size_t new_size)
+void *gclib_realloc(void *ptr, size_t new_size)
 {
     void *new_ptr;
 
-    if (!gc_ready())
+    if (!gclib_ready())
     {
         debug_log("%s\n", "GC is not ready");
 
@@ -187,9 +187,9 @@ void *gc_realloc(void *ptr, size_t new_size)
     return new_ptr;
 }
 
-void gc_free(void *ptr)
+void gclib_free(void *ptr)
 {
-    if (!gc_ready())
+    if (!gclib_ready())
     {
         debug_log("%s\n", "GC is not ready");
 
@@ -202,9 +202,9 @@ void gc_free(void *ptr)
     return;
 }
 
-void gc_collect(void)
+void gclib_collect(void)
 {
-    if (!gc_ready())
+    if (!gclib_ready())
     {
         debug_log("%s\n", "GC is not ready");
 
@@ -216,9 +216,9 @@ void gc_collect(void)
     return;
 }
 
-void gc_force_collect(void)
+void gclib_force_collect(void)
 {
-    if (!gc_ready())
+    if (!gclib_ready())
     {
         debug_log("%s\n", "GC is not ready");
 
@@ -226,6 +226,20 @@ void gc_force_collect(void)
     }
 
     // TODO: run the collector for all generations
+
+    return;
+}
+
+void gclib_print_leaks(FILE *stream)
+{
+    if (!gclib_ready())
+    {
+        debug_log("%s\n", "GC is not ready");
+
+        return;
+    }
+
+    table_print(stream);
 
     return;
 }
