@@ -5,12 +5,14 @@ int main(void)
 {
     int *p;
 
-    gc_init();
+    gclib_init();
 
-    p = gc_alloc(sizeof(int), false);
-    p = gc_realloc(p, sizeof(int) * 2);
+    p = gclib_alloc(sizeof(int), false);
+    p = gclib_realloc(p, sizeof(int) * 2);
 
-    gc_free(p);
+    gclib_print_leaks(stdout);
 
-    gc_cleanup();
+    gclib_free(p);
+
+    gclib_cleanup();
 }

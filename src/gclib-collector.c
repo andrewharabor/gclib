@@ -9,7 +9,7 @@ const generic_ptr *g_data_end_ptr;    // Address of the end of the BSS segment
 // TODO: Implement collector: mark reachable chunks in hash table and then sweep to free unreachable chunks
 // TODO: generations MUST be collected in reverse order to avoid any issues with promotions (to higher generations)
 // TODO: store the generations to collect in an array so they can be marked and swept with one function call
-// TODO: `gc_alloc()` calls the collector so call `__builtin_frame_address(1)` from the collector to get `g_stack_end_ptr`
+// TODO: `gclib_alloc()` calls the collector so call `__builtin_frame_address(1)` from the collector to get `g_stack_end_ptr`
 
 void collector_run(bool all_gens)
 {
