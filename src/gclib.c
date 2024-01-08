@@ -128,7 +128,7 @@ void *gclib_realloc(void *ptr, size_t new_size)
     {
         if (new_size == 0)
         {
-            free(new_ptr); // `malloc()`/`calloc()` may not always return `NULL` in this case
+            free(new_ptr); // `realloc()` may not always return `NULL` in this case
 
             return NULL;
         }
