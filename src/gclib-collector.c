@@ -13,6 +13,7 @@ void collector_run(bool all_gens)
     bool to_collect[GENERATIONS];
     uint8_t gen;
 
+    // See which generations need to be collected
     for (gen = 0; gen < GENERATIONS; gen++)
     {
         if (all_gens || g_alloced_bytes[gen] > MAX_ALLOCED_BYTES)
@@ -39,6 +40,7 @@ void collector_mark(bool to_collect[GENERATIONS], const void **start, const void
     uint8_t gen;
     chunk_node *p_current;
 
+    // Treat each block of 8-bytes as a pointer (that could potentially point to a user-allocated chunk)
     for (ptr = start; ptr < end; ptr++)
     {
         idx = table_hash_ptr(*ptr);
@@ -46,6 +48,7 @@ void collector_mark(bool to_collect[GENERATIONS], const void **start, const void
         {
             if (to_collect[gen])
             {
+                // Iterate through linked list and mark reachable chunks
                 for (p_current = g_hash_table[gen][idx]; p_current != NULL; p_current = p_current->next)
                 {
                     // Incrementing `p_current->ptr` (which is `void *`) below only works because with GCC, `sizeof(void)` is 1
