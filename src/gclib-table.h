@@ -37,7 +37,7 @@ void table_print(FILE *stream);
 void table_free(void);
 
 /* Hash `ptr` and return an number suitable for indexing into `g_hash_table`. */
-uint16_t table_hash_ptr(void *ptr);
+uint16_t table_hash_ptr(const void *ptr);
 
 /* Link the `chunk_node` `*p_node` to the beginning of the linked list starting at `g_hash_table[gen][idx]`. */
 void list_link(uint8_t gen, uint16_t idx, chunk_node *p_node);

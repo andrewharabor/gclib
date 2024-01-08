@@ -1,7 +1,7 @@
 
 #include "gclib-table.h"
 
-chunk_node *g_hash_table[GENERATIONS][HASH_TABLE_SIZE]; // hash table containing linked lists of `chunk_node`s represented user-allocated blocks
+chunk_node *g_hash_table[GENERATIONS][HASH_TABLE_SIZE]; // hash table containing linked lists of `chunk_node`s representing user-allocated blocks
 size_t g_alloced_bytes[GENERATIONS];                    // total size (in bytes) of all allocations for each generation
 
 void table_insert(void *ptr, size_t size)
@@ -44,12 +44,14 @@ void table_remove(void *ptr)
                 list_unlink(gen, idx, p_current, p_previous);
                 free(p_current);
 
-                if (p_previous == NULL) // removed head of list so now it's empty
+                if (p_previous == NULL) // unlinked the head of the list
                 {
-                    continue;
+                    p_current = g_hash_table[gen][idx];
                 }
-
-                p_current = p_previous->next;
+                else
+                {
+                    p_current = p_previous->next;
+                }
             }
             else
             {
@@ -121,7 +123,7 @@ void table_free(void)
     return;
 }
 
-uint16_t table_hash_ptr(void *ptr)
+uint16_t table_hash_ptr(const void *ptr)
 {
     // From https://stackoverflow.com/a/12996028, which is based on https://xorshift.di.unimi.it/splitmix64.c
 
@@ -146,10 +148,6 @@ void list_link(uint8_t gen, uint16_t idx, chunk_node *p_node)
 
 void list_unlink(uint8_t gen, uint16_t idx, chunk_node *p_node, chunk_node *p_previous)
 {
-    size_t size;
-
-    size = p_node->size;
-
     if (p_previous == NULL) // `p_node` is the head of the list
     {
         g_hash_table[gen][idx] = p_node->next;
@@ -159,7 +157,7 @@ void list_unlink(uint8_t gen, uint16_t idx, chunk_node *p_node, chunk_node *p_pr
         p_previous->next = p_node->next;
     }
 
-    g_alloced_bytes[gen] -= size;
+    g_alloced_bytes[gen] -= p_node->size;
 
     return;
 }
