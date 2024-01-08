@@ -184,8 +184,8 @@ void *gclib_realloc(void *ptr, size_t new_size)
         return NULL;
     }
 
-    table_remove(ptr);
-    table_insert(new_ptr, new_size);
+    table_remove(ptr);               // `realloc()` returns the same pointer passed to it after resizing if possible,
+    table_insert(new_ptr, new_size); // which means the removal and insertion is inefficient
     debug_log("realloced chunk - ptr: %p, new ptr: %p, new size: %zu\n", ptr, new_ptr, new_size);
 
     return new_ptr;
@@ -200,7 +200,13 @@ void gclib_free(void *ptr)
         return;
     }
 
-    table_remove(ptr);
+    free(ptr);
+
+    if (ptr != NULL) // `gclib_alloc()` and `gclib_realloc()` don't add null-pointers to the hash table
+    {
+        table_remove(ptr);
+    }
+
     debug_log("freed chunk - ptr: %p\n", ptr);
 
     return;

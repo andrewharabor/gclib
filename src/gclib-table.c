@@ -110,6 +110,7 @@ void table_free(void)
             {
                 p_tmp = p_current;
                 p_current = p_current->next;
+                free(p_tmp->ptr);
                 free(p_tmp);
             }
 
