@@ -13,7 +13,7 @@ Initialize `gclib`.
 MUST BE CALLED FROM `main()` AND BEFORE THE PROGRAM USES ANY `gclib` FUNCTIONS.
 
 #### Description
-`gclib_init()` defines important addresses in the processes' memory structure for the garbage collection step.
+`gclib_init()` defines important addresses from the program's memory structure for the garbage collection step.
 If it is used incorrectly, the garbage collector will function as normal though will not be fully effective in freeing
 unreachable memory chunks. Note that if `gclib_init()` isn't called before a `gclib` function is used, the
 function will return immediately and return a null-value.
