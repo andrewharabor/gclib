@@ -16,13 +16,6 @@ Sweep phase: After all the necessary memory has been checked for references, the
 
 This collector however, also implements generational garbage collecion. The premise is that the longer a chunk has been allocated, the longer it will continue to remain reachable in the program. Here is how this garbage collector implements this idea: When chunks are first allocated, they are placed into generation 0. Once a certain number of bytes has been allocated within this generation, a garbage collection cycle is performed. Unreachable chunks are freed while reachable chunks get promoted to the next generation. This process continues, with each generation only being collected once a certain quota of allocated bytes is filled. Chunks in the last generation are collected the least often and also cannot be promoted.
 
-## A Brief Note from the Author
-
-While this project is technically considered complete, there are still a few more things that I would like to implement. Currently, sufficient time has been devoted to this project and it is in a (hopefully) functional state. In the future, should I have some time to return to this project, I will focus on:
-
-- Refactoring the hash table and linked list that the collector uses in a more modular manner; implementing them is a more generic state and so that they are not as intertwined with the inner-workings and needs of the collector.
-- Writing thorough tests for each "module" of the project (linked list, hash table, collector, etc.) to ensure they work correctly and behave as intended.
-
 ## Limitations
 
 There are quite a few things that hold back this garbage collector. As a non-exhaustive list:
@@ -260,6 +253,13 @@ Print out any unfreed memory chunks allocated through `gclib_alloc()` and `gclib
 #### Return Value
 
 None.
+
+## A Brief Note from the Author
+
+While this project is technically considered complete, there are still a few more things that I would like to implement. Currently, sufficient time has been devoted to this project and it is in a (hopefully) functional state. In the future, should I have some time to return to this project, I will focus on:
+
+- Refactoring the hash table and linked list that the collector uses in a more modular manner; implementing them is a more generic state and so that they are not as intertwined with the inner-workings and needs of the collector.
+- Writing thorough tests for each "module" of the project (linked list, hash table, collector, etc.) to ensure they work correctly and behave as intended.
 
 ## Inspiration
 
