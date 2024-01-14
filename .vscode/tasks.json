@@ -11,7 +11,7 @@
                 "${file}",
                 "-o",
                 "${workspaceRoot}/bin/${fileBasenameNoExtension}",
-                "-lm", // for `<math.h>`
+                "-lm", // for `math.h`
                 "gclib.c",
                 "gclib-collector.c",
                 "gclib-table.c"
