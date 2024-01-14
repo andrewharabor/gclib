@@ -2,15 +2,35 @@
 
 A garbage collection library written in and for C
 
-TODO
-
 ## Description
 
-TODO
+First of all, note that while this project is designed similar to a library, it is not actually intended to be used in such a way. In fact, it is not intended to be used at all as it was more an exercise in learning about garbage collection and memory management in C.
 
-## Usage
+The "library" functions included in this project work as wrappers around the standard-library functions `malloc()`, `calloc()`, `realloc()`, and `free()`, which can be found in `stdlib.h`. That is to say that this project does not implement its own memory allocator.
 
-TODO
+The garbage collector itself works as follows, implementing a mark-and-sweep algorithm:
+
+Mark phase: It establishes the root set, which are segments in the program's memory layout that can contain references to allocated chunks. This specific collector scans the initialized data segment and the BSS segment where global variables are stored as well as the active stack which contains local variables and arguments from function calls. Note that it does not explicitly scan the entirety of the heap itself, where allocated chunks are actually located. It then iterates through each aligned block of 8 bytes (`sizeof(void *)`) within the root set, interprets them as a pointer, and checks to see if it points to or falls within an allocated memory chunk. If so, that chunk is marked as reachable and it is recursively scanned (if the chunk is reachable, anything it points to is also reachable). Note that by pure chance, a set of aligned 8 bytes may just happen to look like a valid pointer, in which case the collector still counts it as a valid reference. This is why the collector is conservative.
+
+Sweep phase: After all the necessary memory has been checked for references, the collector iterates through the allocated chunks and frees those that are unreachable.
+
+This collector however, also implements generational garbage collecion. The premise is that the longer a chunk has been allocated, the longer it will continue to remain reachable in the program. Here is how this garbage collector implements this idea: When chunks are first allocated, they are placed into generation 0. Once a certain number of bytes has been allocated within this generation, a garbage collection cycle is performed. Unreachable chunks are freed while reachable chunks get promoted to the next generation. This process continues, with each generation only being collected once a certain quota of allocated bytes is filled. Chunks in the last generation are collected the least often and also cannot be promoted.
+
+## A Brief Note from the Author
+
+While this project is technically considered complete, there are still a few more things that I would like to implement. Currently, sufficient time has been devoted to this project and it is in a (hopefully) functional state. In the future, should I have some time to return to this project, I will focus on:
+
+- Refactoring the hash table and linked list that the collector uses in a more modular manner; implementing them is a more generic state and so that they are not as intertwined with the inner-workings and needs of the collector.
+- Writing thorough tests for each "module" of the project (linked list, hash table, collector, etc.) to ensure they work correctly and behave as intended.
+
+## Limitations
+
+There are quite a few things that hold back this garbage collector. As a non-exhaustive list:
+
+- No support for multiple threads; it is a stop-the-world collector where the rest of the program must halt completely while the collector runs.
+- Probably only works on 86-64 Linux and when compiled with GCC because of how the locations of the data segment and active stack are obtained.
+- The root set may not encompass everywhere that may contain refernces to allocated memory in the program.
+- Not even sure that it would work as a library unless compiled and linked with the source file(s) that use it.
 
 ## Documentation
 
@@ -242,6 +262,8 @@ Print out any unfreed memory chunks allocated through `gclib_alloc()` and `gclib
 None.
 
 ## Inspiration
+
+Many thanks to the following resources for being the inspiration behind the core ideas of this project:
 
 [Writing Garbage Collector in C](https://www.youtube.com/watch?v=2JgEKEd3tw8)
 
