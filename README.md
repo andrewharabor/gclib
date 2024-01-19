@@ -1,6 +1,6 @@
 # gclib
 
-A garbage collection library written in and for C
+A garbage collection "library" written in and for C
 
 ## Description
 
