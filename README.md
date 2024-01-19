@@ -21,7 +21,7 @@ This collector however, also implements generational garbage collecion. The prem
 There are quite a few things that hold back this garbage collector. As a non-exhaustive list:
 
 - No support for multiple threads; it is a stop-the-world collector where the rest of the program must halt completely while the collector runs.
-- Probably only works on 86-64 Linux and when compiled with GCC because of how the locations of the data segment and active stack are obtained.
+- Probably only works on x86-64 Linux and when compiled with GCC because of how the locations of the data segment and active stack are obtained.
 - The root set may not encompass everywhere that may contain refernces to allocated memory in the program.
 - Not even sure that it would work as a library unless compiled and linked with the source file(s) that use it.
 
