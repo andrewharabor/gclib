@@ -258,7 +258,7 @@ None.
 
 While this project is technically considered complete, there are still a few more things that I would like to implement. Currently, sufficient time has been devoted to this project and it is in a (hopefully) functional state. In the future, should I have some time to return to this project, I will focus on:
 
-- Refactoring the hash table and linked list that the collector uses in a more modular manner; implementing them is a more generic state and so that they are not as intertwined with the inner-workings and needs of the collector.
+- Refactoring the hash table and linked list that the collector uses in a more modular manner; implementing them in a more generic state and so that they are not as intertwined with the inner-workings and needs of the collector.
 - Writing thorough tests for each "module" of the project (linked list, hash table, collector, etc.) to ensure they work correctly and behave as intended.
 
 ## Inspiration
